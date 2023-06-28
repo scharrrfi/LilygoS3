@@ -1,0 +1,127 @@
+esphome:
+  name: MyName
+  friendly_name: Display and Bluetooth Proxy
+
+esp32:
+  board: esp32-s3-devkitc-1
+  framework:
+    type: arduino
+
+external_components:
+  - source: github://landonr/lilygo-tdisplays3-esphome
+    components: [tdisplays3]
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "xyz"
+
+ota:
+  password: "xyz"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "MyHotspot"
+    password: "12345678"
+
+captive_portal:
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+
+bluetooth_proxy:
+  active: true    
+
+sensor:
+  - platform: homeassistant
+    id: Power
+    entity_id: sensor.wechselrichter_active_power
+    internal: true
+  - platform: homeassistant
+    id: Verbrauch
+    entity_id: sensor.smart_meter_active_power
+    internal: true
+    filters:
+      - lambda: return id(Power).state - x;
+
+binary_sensor:
+  - platform: gpio
+    pin: 
+      number: GPIO0
+      inverted: true
+    name: "Button 1"
+  - platform: gpio
+    pin: 
+      number: GPIO14
+      inverted: true
+    name: "Button 2"
+
+output:
+  - platform: ledc
+    pin: GPIO38
+    id: gpio38
+    frequency: 2000
+
+light:
+  - platform: monochromatic
+    output: gpio38
+    name: "Backlight"
+    restore_mode: RESTORE_DEFAULT_ON
+
+graph:
+  # Show bare-minimum auto-ranged graph
+  - id: PV
+    duration: 30min
+    x_grid: 5min
+    width: 320
+    height: 110
+    traces:
+      - sensor: Power
+        color: green
+        line_type: DOTTED
+        line_thickness: 1
+      - sensor: Verbrauch
+        color: red
+        line_type: DOTTED
+        line_thickness: 1
+
+
+font:
+  - file: "gfonts://Roboto"
+    id: roboto
+    size: 19
+
+  - file: "gfonts://Roboto"
+    id: roboto2
+    size: 25
+
+display:
+  - platform: tdisplays3
+    id: disp
+    update_interval: 1s
+    rotation: 270
+    pages:
+      - id: page1
+        lambda: |-
+          it.printf(160, 0, id(roboto2), TextAlign::TOP_CENTER, "PV-Anlage");
+          it.printf(0, 27, id(roboto), green, TextAlign::LEFT, "Produktion %.0f W", id(Power).state);
+          it.printf(320, 27, id(roboto), red, TextAlign::RIGHT, "Verbrauch %.0f W", id(Verbrauch).state);
+          it.graph(0, 50, id(PV));
+
+color:
+  - id: green
+    red: 0%
+    green: 100%
+    blue: 0%
+  - id: red
+    red: 100%
+    green: 0%
+    blue: 0%
